@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <script>
+        let data ={
+            "a1":[7,8,9],
+            "a2":[11,21,31],
+            "a3":[37,38,39],
+        }
+        const show = (id)=> console.log(id+ " 를 보여줘")
+        for (const element of data.a3) {
+            console.log(element+"\n")  //    \n=엔터기능. 줄바꾸는 기능
+            show(element)
+        }
+        
+    </script>
+</body>
+</html>

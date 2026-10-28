@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <script>
+        // key a1 ~ a100 (100개), 각 key의 배열 길이는 100 + i 개로 서로 다름 (a1=101개 ... a100=200개)
+        let data = {}
+        let v = []
+        for (let i = 1; i <= 100; i++) {
+            v.push(i)
+            data["a"+i] = []
+            for (let j = 0; j < 100 + i; j++) {
+                data["a"+i].push(Math.floor(Math.random()*1000))   // 0~999 임의의 값
+            }
+        }
+        const show = (id)=> console.log(id+ " 를 보여줘")
+        for (const i of v) {   // i = 1, 2, 3 순서대로
+            for (const element of data["a"+i]) {
+                console.log(element+"\n")  //    \n=엔터기능. 줄바꾸는 기능 +는 더하기가 아니고 결합이라는 의미
+                show(element)
+            }
+        }
+
+    </script>
+</body>
+</html>
