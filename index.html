@@ -138,9 +138,20 @@
              .slice(0, MAX_RESULTS)
              .map(s => ({ name: s.name, area: s.area, indoor: s.indoor, description: s.type }))
 
-    // jeju_spots.json 에는 좌표가 없어서 OpenStreetMap Nominatim 으로 이름을 좌표로 바꾼다.
+    // 미리 찾아 둔 좌표(jeju_coords.json: { 이름: [위도, 경도] }). 있으면 검색 없이 바로 쓴다.
+    let coords = {}
+    fetch("jeju_coords.json")
+        .then(r => r.json())
+        .then(d => { coords = d; console.log("[coords] jeju_coords.json 로드 완료:", Object.keys(d).length, "곳") })
+        .catch(() => console.log("[coords] jeju_coords.json 없음 - 실시간 검색만 사용"))
+
+    // 미리 찾아 둔 좌표에 없는 장소만 OpenStreetMap Nominatim 으로 이름을 좌표로 바꾼다.
     // 제주도 범위 안에서만 검색하고, 성공한 결과만 localStorage 에 저장한다.
     const geocode = async (name) => {
+        if (coords[name]) {
+            console.log("[geocode] 미리 저장된 좌표 사용:", name, coords[name])
+            return { pos: coords[name], cached: true }
+        }
         const key = "geo:" + name
         try {
             const saved = JSON.parse(localStorage.getItem(key))
