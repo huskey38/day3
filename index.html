@@ -3,106 +3,94 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>제주 관광지 지도</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+    <title>실시간 지진 지구본</title>
     <style>
-        body { margin: 0; font-family: sans-serif; }
-        #bar { padding: 8px 12px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-        #status { color: #555; font-size: 14px; }
-        #map { height: calc(100vh - 52px); }
+        html, body { margin: 0; height: 100%; background: #000; color: #eee; font-family: sans-serif; overflow: hidden; }
+        #globe { position: fixed; inset: 0; }
+        #panel { position: fixed; top: 12px; left: 12px; width: 260px; max-width: calc(100vw - 24px); padding: 12px 14px;
+                 background: rgba(10, 10, 20, 0.75); border: 1px solid #333; border-radius: 8px; font-size: 13px; }
+        #panel h1 { margin: 0 0 4px; font-size: 16px; }
+        #panel p { margin: 2px 0; color: #aaa; }
+        #list { margin: 8px 0 0; padding: 0; list-style: none; }
+        #list li { padding: 4px 0; border-top: 1px solid #333; cursor: pointer; }
+        #list b { color: #ff6b4a; }
+        #credit { position: fixed; bottom: 8px; right: 12px; font-size: 11px; color: #888; }
+        #credit a { color: #aaa; }
     </style>
 </head>
 <body>
-    <div id="bar">
-        <label>지역
-            <select id="area">
-                <option>동쪽</option>
-                <option>서쪽</option>
-                <option>서귀포</option>
-                <option>제주시</option>
-            </select>
-        </label>
-        <label>실내/야외
-            <select id="indoor">
-                <option value="">전체</option>
-                <option value="true">실내</option>
-                <option value="false">야외</option>
-            </select>
-        </label>
-        <button id="search">찾기</button>
-        <span id="status"></span>
+    <div id="globe"></div>
+    <div id="panel">
+        <h1>실시간 지진 지구본</h1>
+        <p id="status">불러오는 중...</p>
+        <p>최근 24시간 · 1분마다 갱신 · 크기가 클수록 큰 지진</p>
+        <ul id="list"></ul>
     </div>
-    <div id="map"></div>
+    <div id="credit">지진 데이터: <a href="https://earthquake.usgs.gov/">USGS</a></div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/globe.gl@2.34.4/dist/globe.gl.min.js"></script>
     <script>
-        const MAX_RESULTS = 8
-        const map = L.map("map").setView([33.38, 126.55], 10)   // 제주도 중심
-        L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-            maxZoom: 19,
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        }).addTo(map)
-        const markers = L.layerGroup().addTo(map)
+        const FEED = "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson"
         const statusEl = document.getElementById("status")
+        const listEl = document.getElementById("list")
 
-        let spots = []
+        // 규모에 따라 노랑 → 주황 → 빨강
+        const color = (mag) => mag >= 6 ? "#ff1744" : mag >= 5 ? "#ff6b4a" : mag >= 4 ? "#ffb300" : "#ffee58"
 
-        // api/tools.js 의 find_spots 와 같은 규칙 (브라우저에서는 require 를 쓸 수 없어 옮겨 적음)
-        const findSpots = (area, indoor) =>
-            spots.filter(s => s.area.startsWith(area) && (indoor === undefined || s.indoor === indoor))
-                 .slice(0, MAX_RESULTS)
+        const globe = Globe()(document.getElementById("globe"))
+            .globeImageUrl("https://unpkg.com/three-globe@2.31.0/example/img/earth-night.jpg")
+            .bumpImageUrl("https://unpkg.com/three-globe@2.31.0/example/img/earth-topology.png")
+            .backgroundImageUrl("https://unpkg.com/three-globe@2.31.0/example/img/night-sky.png")
+            .pointLat("lat").pointLng("lng")
+            .pointAltitude(d => Math.max(d.mag, 0) * 0.02)
+            .pointRadius(d => Math.max(d.mag, 0.5) * 0.08)
+            .pointColor(d => color(d.mag))
+            .pointLabel(d => `<b>M ${d.mag}</b><br>${d.place}<br>${new Date(d.time).toLocaleString("ko-KR")}`)
+            .ringLat("lat").ringLng("lng")
+            .ringColor(d => () => color(d.mag))
+            .ringMaxRadius(d => Math.max(d.mag, 1) * 1.5)
+            .ringPropagationSpeed(2)
+            .ringRepeatPeriod(1500)
 
-        // jeju_spots.json 에는 좌표가 없어서 OpenStreetMap Nominatim 으로 이름을 좌표로 바꾼다.
-        // 제주도 범위 안에서만 검색하고, 결과는 localStorage 에 저장해 다시 요청하지 않는다.
-        const geocode = async (name) => {
-            const key = "geo:" + name
-            const saved = localStorage.getItem(key)
-            if (saved) return JSON.parse(saved)
-            const url = "https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=kr" +
-                "&viewbox=126.1,33.6,127.0,33.1&bounded=1&q=" + encodeURIComponent(name)
-            const res = await fetch(url)
-            const found = (await res.json())[0]
-            const pos = found ? [Number(found.lat), Number(found.lon)] : null
-            localStorage.setItem(key, JSON.stringify(pos))
-            return pos
-        }
+        globe.controls().autoRotate = true
+        globe.controls().autoRotateSpeed = 0.4
 
-        const sleep = (ms) => new Promise(r => setTimeout(r, ms))
+        const load = async () => {
+            try {
+                const res = await fetch(FEED)
+                const quakes = (await res.json()).features
+                    .filter(f => f.properties.mag !== null)
+                    .map(f => ({
+                        lng: f.geometry.coordinates[0],
+                        lat: f.geometry.coordinates[1],
+                        mag: f.properties.mag,
+                        place: f.properties.place,
+                        time: f.properties.time
+                    }))
+                globe.pointsData(quakes)
+                globe.ringsData(quakes.filter(q => q.mag >= 2.5))   // 작은 지진까지 모두 퍼뜨리면 어지러워서 제외
 
-        const search = async () => {
-            const area = document.getElementById("area").value
-            const v = document.getElementById("indoor").value
-            const indoor = v === "" ? undefined : v === "true"
-            markers.clearLayers()
-
-            const result = findSpots(area, indoor)
-            const bounds = []
-            const missing = []
-            for (const [n, s] of result.entries()) {
-                statusEl.textContent = `좌표 찾는 중... ${n + 1}/${result.length}`
-                const cached = localStorage.getItem("geo:" + s.name) !== null
-                const pos = await geocode(s.name)
-                if (!cached) await sleep(1100)   // Nominatim 이용 규칙: 초당 1회 이하
-                if (!pos) { missing.push(s.name); continue }
-
-                const box = document.createElement("div")
-                const title = document.createElement("b")
-                title.textContent = s.name
-                box.append(title, document.createElement("br"),
-                    `${s.area} · ${s.indoor ? "실내" : "야외"} · ${s.type}`)
-                L.marker(pos).addTo(markers).bindPopup(box)
-                bounds.push(pos)
+                const top = [...quakes].sort((a, b) => b.mag - a.mag).slice(0, 5)
+                listEl.replaceChildren(...top.map(q => {
+                    const li = document.createElement("li")
+                    const b = document.createElement("b")
+                    b.textContent = "M " + q.mag
+                    li.append(b, " " + q.place)
+                    li.addEventListener("click", () => {
+                        globe.controls().autoRotate = false
+                        globe.pointOfView({ lat: q.lat, lng: q.lng, altitude: 1.5 }, 1000)
+                    })
+                    return li
+                }))
+                statusEl.textContent = `최근 24시간 지진 ${quakes.length}건 · ${new Date().toLocaleTimeString("ko-KR")} 갱신`
+            } catch (e) {
+                statusEl.textContent = "지진 데이터를 불러오지 못했습니다."
             }
-            if (bounds.length) map.fitBounds(bounds, { padding: [40, 40], maxZoom: 13 })
-            statusEl.textContent = `${bounds.length}곳 표시` +
-                (missing.length ? ` (좌표를 못 찾음: ${missing.join(", ")})` : "")
         }
 
-        document.getElementById("search").addEventListener("click", search)
-        fetch("jeju_spots.json")
-            .then(r => r.json())
-            .then(d => { spots = d.spots; statusEl.textContent = `${spots.length}곳 불러옴` })
-            .catch(() => { statusEl.textContent = "jeju_spots.json 을 못 불러왔습니다. 웹 서버로 열어주세요." })
+        load()
+        setInterval(load, 60000)
+        window.addEventListener("resize", () => globe.width(innerWidth).height(innerHeight))
     </script>
 </body>
 </html>
