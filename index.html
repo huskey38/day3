@@ -10,8 +10,13 @@
         header { padding: 12px 16px 0; }
         h1 { font-size: 20px; margin: 0 0 4px; }
         .sub { color: #666; font-size: 14px; margin: 0; }
-        .layout { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 12px 16px 16px; }
-        @media (max-width: 800px) { .layout { grid-template-columns: 1fr; } }
+        .layout { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 12px 16px 16px; align-items: start; }
+        /* 채팅이 길어져 스크롤해도 지도 영역이 화면 위쪽에 붙어 따라 내려온다 */
+        .map-panel { position: sticky; top: 12px; }
+        @media (max-width: 800px) {
+            .layout { grid-template-columns: 1fr; }
+            .map-panel { position: static; }   /* 한 줄로 쌓이는 좁은 화면에서는 고정하지 않는다 */
+        }
         form.ask { display: flex; gap: 8px; }
         input { flex: 1; padding: 10px; font-size: 15px; border: 1px solid #bbb; border-radius: 6px; min-width: 0; }
         button { padding: 10px 16px; font-size: 15px; border: 0; border-radius: 6px; background: #0b7285; color: #fff; cursor: pointer; }
@@ -27,7 +32,7 @@
         .bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; font-size: 14px; }
         .bar select, .bar button { padding: 6px 10px; font-size: 14px; }
         #status { color: #555; font-size: 13px; margin: 0 0 6px; min-height: 18px; }
-        #map { height: 460px; border-radius: 8px; }
+        #map { height: min(460px, calc(100vh - 120px)); border-radius: 8px; }
     </style>
 </head>
 <body>
@@ -50,7 +55,7 @@
         <div id="log"></div>
     </section>
 
-    <section>
+    <section class="map-panel">
         <div class="bar">
             <label>지역
                 <select id="area">
