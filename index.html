@@ -5,12 +5,37 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>제주 여행 추천 에이전트</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap">
     <style>
-        body { margin: 0; font-family: sans-serif; background: #f4f7fa; color: #222; }
-        header { padding: 12px 16px 0; }
-        h1 { font-size: 20px; margin: 0 0 4px; }
-        .sub { color: #666; font-size: 14px; margin: 0; }
-        .layout { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 12px 16px 16px; align-items: start; }
+        :root {
+            --sea: #cdeee9;
+            --sky: #e3f1fb;
+            --peach: #ffe9d6;
+            --orange: #ff9f5a;
+            --orange-deep: #f58a3c;
+            --ink: #3b4a5a;
+            --muted: #7b8a99;
+            --shadow: 0 8px 24px rgba(80, 120, 150, 0.12);
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0; color: var(--ink);
+            font-family: "Noto Sans KR", "Malgun Gothic", sans-serif;
+            background: linear-gradient(180deg, var(--sky) 0%, #f6fbfb 45%, #fff6ee 100%) fixed;
+        }
+        header {
+            padding: 28px 20px 40px; text-align: center;
+            background: linear-gradient(120deg, var(--sea), var(--sky) 55%, var(--peach));
+            border-radius: 0 0 40px 40px; box-shadow: var(--shadow);
+        }
+        h1 { font-size: 26px; margin: 0 0 8px; font-weight: 700; }
+        .sub { color: var(--muted); font-size: 14px; margin: 0 auto; max-width: 640px; line-height: 1.6; }
+        .layout {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
+            max-width: 1200px; margin: -22px auto 0; padding: 0 20px 28px; align-items: start;
+        }
+        .card { background: rgba(255, 255, 255, 0.88); border-radius: 24px; padding: 18px; box-shadow: var(--shadow); backdrop-filter: blur(6px); }
         /* 채팅이 길어져 스크롤해도 지도 영역이 화면 위쪽에 붙어 따라 내려온다 */
         .map-panel { position: sticky; top: 12px; }
         @media (max-width: 800px) {
@@ -18,31 +43,47 @@
             .map-panel { position: static; }   /* 한 줄로 쌓이는 좁은 화면에서는 고정하지 않는다 */
         }
         form.ask { display: flex; gap: 8px; }
-        input { flex: 1; padding: 10px; font-size: 15px; border: 1px solid #bbb; border-radius: 6px; min-width: 0; }
-        button { padding: 10px 16px; font-size: 15px; border: 0; border-radius: 6px; background: #0b7285; color: #fff; cursor: pointer; }
-        button:disabled { background: #999; cursor: wait; }
-        .examples { margin: 8px 0 12px; display: flex; gap: 6px; flex-wrap: wrap; }
-        .examples button { background: #e3edf2; color: #0b4a58; font-size: 13px; padding: 6px 10px; }
-        .msg { background: #fff; border-radius: 8px; padding: 12px 14px; margin: 10px 0; white-space: pre-wrap; line-height: 1.5; }
-        .msg.user { background: #d0ebff; }
-        .tool { background: #fff9db; border-left: 4px solid #f08c00; border-radius: 4px; padding: 8px 12px; margin: 6px 0; font-size: 13px; }
-        .tool summary { cursor: pointer; font-weight: bold; }
-        .tool pre { margin: 6px 0 0; white-space: pre-wrap; word-break: break-all; max-height: 200px; overflow: auto; }
-        .err { color: #c92a2a; }
-        .bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; font-size: 14px; }
-        .bar select, .bar button { padding: 6px 10px; font-size: 14px; }
-        #status { color: #555; font-size: 13px; margin: 0 0 6px; min-height: 18px; }
-        #map { height: min(460px, calc(100vh - 120px)); border-radius: 8px; }
+        input {
+            flex: 1; padding: 12px 16px; font: inherit; font-size: 15px; color: var(--ink); min-width: 0;
+            border: 2px solid #e1ecf3; border-radius: 999px; background: #fff; outline: none; transition: border-color .2s, box-shadow .2s;
+        }
+        input:focus { border-color: var(--orange); box-shadow: 0 0 0 4px rgba(255, 159, 90, 0.2); }
+        button {
+            padding: 12px 20px; font: inherit; font-size: 15px; font-weight: 500; color: #fff; cursor: pointer;
+            border: 0; border-radius: 999px; background: linear-gradient(135deg, #ffb877, var(--orange-deep));
+            box-shadow: 0 4px 12px rgba(245, 138, 60, 0.3); transition: transform .15s, box-shadow .15s;
+        }
+        button:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(245, 138, 60, 0.4); }
+        button:disabled { background: #cfd8de; box-shadow: none; cursor: wait; transform: none; }
+        .examples { margin: 12px 0 8px; display: flex; gap: 8px; flex-wrap: wrap; }
+        .examples button { background: var(--sea); color: #2f6f69; font-size: 13px; padding: 8px 14px; box-shadow: none; }
+        .examples button:hover { background: #bfe7e1; box-shadow: none; }
+        #log { display: flex; flex-direction: column; }
+        .msg { background: #fff; border-radius: 18px 18px 18px 6px; padding: 12px 16px; margin: 8px 0; max-width: 92%; align-self: flex-start;
+               white-space: pre-wrap; line-height: 1.65; box-shadow: 0 2px 8px rgba(80, 120, 150, 0.08); }
+        .msg.user { background: linear-gradient(135deg, #ffd9b8, var(--peach)); border-radius: 18px 18px 6px 18px; align-self: flex-end; }
+        .tool { background: #eaf8f5; border-radius: 14px; padding: 8px 14px; margin: 4px 0; font-size: 12.5px; color: #3f7d76; max-width: 92%; align-self: flex-start; }
+        .tool summary { cursor: pointer; font-weight: 500; }
+        .tool pre { margin: 8px 0 0; white-space: pre-wrap; word-break: break-all; max-height: 200px; overflow: auto; color: var(--ink); }
+        .err { color: #d6615a; }
+        .bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; font-size: 14px; color: var(--muted); }
+        .bar select {
+            padding: 8px 12px; font: inherit; font-size: 14px; color: var(--ink);
+            border: 2px solid #e1ecf3; border-radius: 999px; background: #fff; outline: none;
+        }
+        .bar button { padding: 8px 16px; font-size: 14px; }
+        #status { color: var(--muted); font-size: 13px; margin: 0 0 8px; min-height: 18px; }
+        #map { height: min(460px, calc(100vh - 150px)); border-radius: 18px; border: 3px solid #fff; box-shadow: 0 4px 14px rgba(80, 120, 150, 0.15); }
     </style>
 </head>
 <body>
 <header>
-    <h1>제주 여행 추천 에이전트</h1>
-    <p class="sub">질문하면 에이전트가 <b>get_weather</b>(Open-Meteo)와 <b>find_spots</b>(관광지 목록)를 스스로 골라 호출해 추천하고, 추천 장소를 오른쪽 지도에 표시합니다.</p>
+    <h1>🍊 제주 여행 추천 에이전트 🌊</h1>
+    <p class="sub">궁금한 걸 물어보세요. 에이전트가 <b>날씨</b>(Open-Meteo)와 <b>관광지 목록</b>을 스스로 살펴보고 어울리는 곳을 골라, 오른쪽 지도에 표시해 드려요.</p>
 </header>
 
 <div class="layout">
-    <section>
+    <section class="card">
         <form class="ask" id="form">
             <input id="q" placeholder="예: 내일 서귀포에서 갈 만한 곳 추천해줘" maxlength="500" autocomplete="off">
             <button id="send">물어보기</button>
@@ -55,7 +96,7 @@
         <div id="log"></div>
     </section>
 
-    <section class="map-panel">
+    <section class="map-panel card">
         <div class="bar">
             <label>지역
                 <select id="area">
@@ -106,13 +147,21 @@
         const key = "geo:" + name
         try {
             const saved = JSON.parse(localStorage.getItem(key))
-            if (saved) return { pos: saved, cached: true }
+            if (saved) {
+                console.log("[geocode] 저장된 좌표 사용:", name, saved)
+                return { pos: saved, cached: true }
+            }
         } catch (e) {}
         const url = "https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=kr" +
             "&viewbox=126.1,33.6,127.0,33.1&bounded=1&q=" + encodeURIComponent(name)
+        console.log("[geocode] Nominatim 요청:", name, url)
         const res = await fetch(url)
-        if (!res.ok) return { pos: null, cached: false }
+        if (!res.ok) {
+            console.log("[geocode] Nominatim 오류:", name, "HTTP", res.status)
+            return { pos: null, cached: false }
+        }
         const found = (await res.json())[0]
+        console.log("[geocode] Nominatim 결과:", name, found || "없음")
         const pos = found ? [Number(found.lat), Number(found.lon)] : null
         if (pos) try { localStorage.setItem(key, JSON.stringify(pos)) } catch (e) {}
         return { pos, cached: false }
@@ -123,15 +172,16 @@
     // spots: [{ name, area, indoor, description }] 를 지도에 표시
     const plotSpots = async (list) => {
         const myId = ++plotId
+        console.log("[map] 지도에 표시 시작 #" + myId, list.map(s => s.name))
         markers.clearLayers()
         const bounds = []
         const missing = []
         for (const [n, s] of list.entries()) {
             statusEl.textContent = `좌표 찾는 중... ${n + 1}/${list.length}`
             const { pos, cached } = await geocode(s.name)
-            if (myId !== plotId) return
+            if (myId !== plotId) { console.log("[map] 새 요청이 들어와 #" + myId + " 중단"); return }
             if (!cached) await sleep(1100)   // Nominatim 이용 규칙: 초당 1회 이하
-            if (myId !== plotId) return
+            if (myId !== plotId) { console.log("[map] 새 요청이 들어와 #" + myId + " 중단"); return }
             if (!pos) { missing.push(s.name); continue }
 
             const box = document.createElement("div")
@@ -143,6 +193,7 @@
             bounds.push(pos)
             map.fitBounds(bounds, { padding: [40, 40], maxZoom: 13 })
         }
+        console.log("[map] 표시 완료 #" + myId, "핀", bounds.length, "개, 좌표 못 찾음:", missing)
         statusEl.textContent = `${bounds.length}곳 표시` +
             (missing.length ? ` (좌표를 못 찾음: ${missing.join(", ")})` : "")
     }
@@ -150,13 +201,16 @@
     document.getElementById("search").addEventListener("click", () => {
         if (!spots.length) { statusEl.textContent = "jeju_spots.json 을 아직 못 불러왔습니다. 웹 서버로 열어주세요."; return }
         const v = document.getElementById("indoor").value
-        plotSpots(findSpots(document.getElementById("area").value, v === "" ? undefined : v === "true"))
+        const area = document.getElementById("area").value
+        const indoor = v === "" ? undefined : v === "true"
+        console.log("[search] 직접 찾기:", { area, indoor })
+        plotSpots(findSpots(area, indoor))
     })
 
     fetch("jeju_spots.json")
         .then(r => r.json())
-        .then(d => { spots = d.spots })
-        .catch(() => { statusEl.textContent = "jeju_spots.json 을 못 불러왔습니다. 웹 서버로 열어주세요." })
+        .then(d => { spots = d.spots; console.log("[spots] jeju_spots.json 로드 완료:", spots.length, "곳") })
+        .catch((e) => { console.log("[spots] jeju_spots.json 로드 실패:", e); statusEl.textContent = "jeju_spots.json 을 못 불러왔습니다. 웹 서버로 열어주세요." })
 
     // ---------- 에이전트 채팅 ----------
     const form = document.getElementById("form")
@@ -192,6 +246,7 @@
              .forEach(s => byName.set(s.name, s))
         const all = [...byName.values()]
         const mentioned = all.filter(s => answer.includes(s.name))
+        console.log("[agent] find_spots 후보", all.length, "곳 중 답변에 언급된 장소", mentioned.map(s => s.name))
         return mentioned.length ? mentioned : all
     }
 
@@ -199,6 +254,8 @@
         add("msg user", text)
         const wait = add("msg", "에이전트가 도구를 고르는 중...")
         send.disabled = true
+        console.log("[ask] 사용자 질문:", text)
+        console.log("[ask] POST /api/chat 요청 보냄")
         try {
             const res = await fetch("/api/chat", {
                 method: "POST",
@@ -206,13 +263,18 @@
                 body: JSON.stringify({ message: text })
             })
             const data = await res.json()
+            console.log("[ask] 서버 응답: HTTP", res.status, data)
             wait.remove()
             if (!res.ok) throw new Error(data.error || "요청 실패")
+            ;(data.raw || []).forEach((ex, i) => console.log(`[gemini] 호출 ${i + 1} 원문 (HTTP ${ex.status}, 모델 ${ex.model})`, ex))
+            data.steps.forEach((s, i) => console.log(`[tool] ${i + 1}번째 도구 호출: ${s.tool}`, "입력:", s.input, "결과:", s.output))
             data.steps.forEach(addTool)
+            console.log("[agent] 최종 답변:", data.answer)
             add("msg", data.answer)
             const list = spotsToPlot(data.steps, data.answer)
             if (list.length) plotSpots(list)
         } catch (e) {
+            console.log("[ask] 오류:", e.message)
             wait.remove()
             add("msg err", "오류: " + e.message)
         } finally {
