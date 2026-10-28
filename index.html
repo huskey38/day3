@@ -4,16 +4,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>제주 여행 추천 에이전트</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
     <style>
         body { margin: 0; font-family: sans-serif; background: #f4f7fa; color: #222; }
-        main { max-width: 720px; margin: 0 auto; padding: 16px; }
-        h1 { font-size: 20px; margin: 8px 0 4px; }
-        .sub { color: #666; font-size: 14px; margin: 0 0 12px; }
-        form { display: flex; gap: 8px; }
-        input { flex: 1; padding: 10px; font-size: 15px; border: 1px solid #bbb; border-radius: 6px; }
+        header { padding: 12px 16px 0; }
+        h1 { font-size: 20px; margin: 0 0 4px; }
+        .sub { color: #666; font-size: 14px; margin: 0; }
+        .layout { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 12px 16px 16px; }
+        @media (max-width: 800px) { .layout { grid-template-columns: 1fr; } }
+        form.ask { display: flex; gap: 8px; }
+        input { flex: 1; padding: 10px; font-size: 15px; border: 1px solid #bbb; border-radius: 6px; min-width: 0; }
         button { padding: 10px 16px; font-size: 15px; border: 0; border-radius: 6px; background: #0b7285; color: #fff; cursor: pointer; }
         button:disabled { background: #999; cursor: wait; }
-        .examples { margin: 8px 0 16px; display: flex; gap: 6px; flex-wrap: wrap; }
+        .examples { margin: 8px 0 12px; display: flex; gap: 6px; flex-wrap: wrap; }
         .examples button { background: #e3edf2; color: #0b4a58; font-size: 13px; padding: 6px 10px; }
         .msg { background: #fff; border-radius: 8px; padding: 12px 14px; margin: 10px 0; white-space: pre-wrap; line-height: 1.5; }
         .msg.user { background: #d0ebff; }
@@ -21,25 +24,136 @@
         .tool summary { cursor: pointer; font-weight: bold; }
         .tool pre { margin: 6px 0 0; white-space: pre-wrap; word-break: break-all; max-height: 200px; overflow: auto; }
         .err { color: #c92a2a; }
+        .bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; font-size: 14px; }
+        .bar select, .bar button { padding: 6px 10px; font-size: 14px; }
+        #status { color: #555; font-size: 13px; margin: 0 0 6px; min-height: 18px; }
+        #map { height: 460px; border-radius: 8px; }
     </style>
 </head>
 <body>
-<main>
+<header>
     <h1>제주 여행 추천 에이전트</h1>
-    <p class="sub">질문하면 에이전트가 <b>get_weather</b>(Open-Meteo)와 <b>find_spots</b>(관광지 목록)를 스스로 골라 호출해 추천합니다.</p>
-    <form id="form">
-        <input id="q" placeholder="예: 내일 서귀포에서 갈 만한 곳 추천해줘" maxlength="500" autocomplete="off">
-        <button id="send">물어보기</button>
-    </form>
-    <div class="examples">
-        <button type="button">오늘 제주시에서 뭐 하면 좋을까?</button>
-        <button type="button">내일 동쪽에서 갈 만한 곳 추천해줘</button>
-        <button type="button">서쪽 여행인데 비 오면 어디가 좋아?</button>
-    </div>
-    <div id="log"></div>
-</main>
+    <p class="sub">질문하면 에이전트가 <b>get_weather</b>(Open-Meteo)와 <b>find_spots</b>(관광지 목록)를 스스로 골라 호출해 추천하고, 추천 장소를 오른쪽 지도에 표시합니다.</p>
+</header>
 
+<div class="layout">
+    <section>
+        <form class="ask" id="form">
+            <input id="q" placeholder="예: 내일 서귀포에서 갈 만한 곳 추천해줘" maxlength="500" autocomplete="off">
+            <button id="send">물어보기</button>
+        </form>
+        <div class="examples">
+            <button type="button">오늘 제주시에서 뭐 하면 좋을까?</button>
+            <button type="button">내일 동쪽에서 갈 만한 곳 추천해줘</button>
+            <button type="button">서쪽 여행인데 비 오면 어디가 좋아?</button>
+        </div>
+        <div id="log"></div>
+    </section>
+
+    <section>
+        <div class="bar">
+            <label>지역
+                <select id="area">
+                    <option>동쪽</option>
+                    <option>서쪽</option>
+                    <option>서귀포</option>
+                    <option>제주시</option>
+                </select>
+            </label>
+            <label>실내/야외
+                <select id="indoor">
+                    <option value="">전체</option>
+                    <option value="true">실내</option>
+                    <option value="false">야외</option>
+                </select>
+            </label>
+            <button id="search">지도에서 직접 찾기</button>
+        </div>
+        <p id="status"></p>
+        <div id="map"></div>
+    </section>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
+    // ---------- 지도 (jeju-map.html 의 기능) ----------
+    const MAX_RESULTS = 8
+    const map = L.map("map").setView([33.38, 126.55], 10)   // 제주도 중심
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(map)
+    const markers = L.layerGroup().addTo(map)
+    const statusEl = document.getElementById("status")
+
+    let spots = []
+    let plotId = 0   // 새 표시 요청이 들어오면 이전 요청을 중단하기 위한 번호
+
+    // api/tools.js 의 find_spots 와 같은 규칙 (브라우저에서는 require 를 쓸 수 없어 옮겨 적음)
+    const findSpots = (area, indoor) =>
+        spots.filter(s => s.area.startsWith(area) && (indoor === undefined || s.indoor === indoor))
+             .slice(0, MAX_RESULTS)
+             .map(s => ({ name: s.name, area: s.area, indoor: s.indoor, description: s.type }))
+
+    // jeju_spots.json 에는 좌표가 없어서 OpenStreetMap Nominatim 으로 이름을 좌표로 바꾼다.
+    // 제주도 범위 안에서만 검색하고, 성공한 결과만 localStorage 에 저장한다.
+    const geocode = async (name) => {
+        const key = "geo:" + name
+        try {
+            const saved = JSON.parse(localStorage.getItem(key))
+            if (saved) return { pos: saved, cached: true }
+        } catch (e) {}
+        const url = "https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=kr" +
+            "&viewbox=126.1,33.6,127.0,33.1&bounded=1&q=" + encodeURIComponent(name)
+        const res = await fetch(url)
+        if (!res.ok) return { pos: null, cached: false }
+        const found = (await res.json())[0]
+        const pos = found ? [Number(found.lat), Number(found.lon)] : null
+        if (pos) try { localStorage.setItem(key, JSON.stringify(pos)) } catch (e) {}
+        return { pos, cached: false }
+    }
+
+    const sleep = (ms) => new Promise(r => setTimeout(r, ms))
+
+    // spots: [{ name, area, indoor, description }] 를 지도에 표시
+    const plotSpots = async (list) => {
+        const myId = ++plotId
+        markers.clearLayers()
+        const bounds = []
+        const missing = []
+        for (const [n, s] of list.entries()) {
+            statusEl.textContent = `좌표 찾는 중... ${n + 1}/${list.length}`
+            const { pos, cached } = await geocode(s.name)
+            if (myId !== plotId) return
+            if (!cached) await sleep(1100)   // Nominatim 이용 규칙: 초당 1회 이하
+            if (myId !== plotId) return
+            if (!pos) { missing.push(s.name); continue }
+
+            const box = document.createElement("div")
+            const title = document.createElement("b")
+            title.textContent = s.name
+            box.append(title, document.createElement("br"),
+                `${s.area} · ${s.indoor ? "실내" : "야외"} · ${s.description}`)
+            L.marker(pos).addTo(markers).bindPopup(box)
+            bounds.push(pos)
+            map.fitBounds(bounds, { padding: [40, 40], maxZoom: 13 })
+        }
+        statusEl.textContent = `${bounds.length}곳 표시` +
+            (missing.length ? ` (좌표를 못 찾음: ${missing.join(", ")})` : "")
+    }
+
+    document.getElementById("search").addEventListener("click", () => {
+        if (!spots.length) { statusEl.textContent = "jeju_spots.json 을 아직 못 불러왔습니다. 웹 서버로 열어주세요."; return }
+        const v = document.getElementById("indoor").value
+        plotSpots(findSpots(document.getElementById("area").value, v === "" ? undefined : v === "true"))
+    })
+
+    fetch("jeju_spots.json")
+        .then(r => r.json())
+        .then(d => { spots = d.spots })
+        .catch(() => { statusEl.textContent = "jeju_spots.json 을 못 불러왔습니다. 웹 서버로 열어주세요." })
+
+    // ---------- 에이전트 채팅 ----------
     const form = document.getElementById("form")
     const q = document.getElementById("q")
     const send = document.getElementById("send")
@@ -65,6 +179,17 @@
         log.append(box)
     }
 
+    // 답변에 이름이 나온 장소만 지도에 표시한다. 하나도 안 나오면 find_spots 결과 전체를 표시한다.
+    const spotsToPlot = (steps, answer) => {
+        const byName = new Map()
+        steps.filter(s => s.tool === "find_spots")
+             .flatMap(s => s.output.spots || [])
+             .forEach(s => byName.set(s.name, s))
+        const all = [...byName.values()]
+        const mentioned = all.filter(s => answer.includes(s.name))
+        return mentioned.length ? mentioned : all
+    }
+
     const ask = async (text) => {
         add("msg user", text)
         const wait = add("msg", "에이전트가 도구를 고르는 중...")
@@ -80,6 +205,8 @@
             if (!res.ok) throw new Error(data.error || "요청 실패")
             data.steps.forEach(addTool)
             add("msg", data.answer)
+            const list = spotsToPlot(data.steps, data.answer)
+            if (list.length) plotSpots(list)
         } catch (e) {
             wait.remove()
             add("msg err", "오류: " + e.message)
