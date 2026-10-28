@@ -62,9 +62,6 @@
         .msg { background: #fff; border-radius: 18px 18px 18px 6px; padding: 12px 16px; margin: 8px 0; max-width: 92%; align-self: flex-start;
                white-space: pre-wrap; line-height: 1.65; box-shadow: 0 2px 8px rgba(80, 120, 150, 0.08); }
         .msg.user { background: linear-gradient(135deg, #ffd9b8, var(--peach)); border-radius: 18px 18px 6px 18px; align-self: flex-end; }
-        .tool { background: #eaf8f5; border-radius: 14px; padding: 8px 14px; margin: 4px 0; font-size: 12.5px; color: #3f7d76; max-width: 92%; align-self: flex-start; }
-        .tool summary { cursor: pointer; font-weight: 500; }
-        .tool pre { margin: 8px 0 0; white-space: pre-wrap; word-break: break-all; max-height: 200px; overflow: auto; color: var(--ink); }
         .err { color: #d6615a; }
         .bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; font-size: 14px; color: var(--muted); }
         .bar select {
@@ -226,18 +223,6 @@
         return div
     }
 
-    // 에이전트가 호출한 도구와 입력·결과를 접어서 보여준다.
-    const addTool = (step) => {
-        const box = document.createElement("details")
-        box.className = "tool"
-        const sum = document.createElement("summary")
-        sum.textContent = `도구 호출: ${step.tool}(${JSON.stringify(step.input)})`
-        const pre = document.createElement("pre")
-        pre.textContent = JSON.stringify(step.output, null, 2)
-        box.append(sum, pre)
-        log.append(box)
-    }
-
     // 답변에 이름이 나온 장소만 지도에 표시한다. 하나도 안 나오면 find_spots 결과 전체를 표시한다.
     const spotsToPlot = (steps, answer) => {
         const byName = new Map()
@@ -268,7 +253,6 @@
             if (!res.ok) throw new Error(data.error || "요청 실패")
             ;(data.raw || []).forEach((ex, i) => console.log(`[gemini] 호출 ${i + 1} 원문 (HTTP ${ex.status}, 모델 ${ex.model})`, ex))
             data.steps.forEach((s, i) => console.log(`[tool] ${i + 1}번째 도구 호출: ${s.tool}`, "입력:", s.input, "결과:", s.output))
-            data.steps.forEach(addTool)
             console.log("[agent] 최종 답변:", data.answer)
             add("msg", data.answer)
             const list = spotsToPlot(data.steps, data.answer)
